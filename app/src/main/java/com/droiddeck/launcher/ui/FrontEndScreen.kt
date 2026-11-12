@@ -224,6 +224,7 @@ class FrontEndActions(
     val onInstallPackage: (String) -> Unit,
     val onRemovePackage: (String) -> Unit,
     val onRuntime: () -> Unit,
+    val onImportRuntime: (() -> Unit)? = null,
     val onVkBridge: (Boolean) -> Unit = {},
     val onVenus: (Boolean) -> Unit = {},
     val onVkBridgeSafe: (Boolean) -> Unit = {},

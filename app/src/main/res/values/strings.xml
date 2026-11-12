@@ -2185,6 +2185,10 @@
     <string name="rtinst_removing_leftovers">Removing runtime leftovers</string>
     <string name="rtinst_downloading">Downloading</string>
     <string name="rtinst_verifying">Verifying</string>
+    <string name="rtinst_import_archive">Install from file</string>
+    <string name="rtinst_copying_archive">Copying the Linux runtime archive</string>
+    <string name="rtinst_import_catalog_failed">Could not reach the runtime catalog to verify the archive.</string>
+    <string name="rtinst_import_failed">Could not install the Linux runtime. Check that the file matches the current official runtime archive and that any required downloads are reachable.</string>
     <string name="rtinst_extracting">Extracting</string>
     <string name="rtinst_channel_description">Shows while the Linux runtime is installed or removed</string>
     <string name="rtinst_title_installing">Installing the Linux runtime</string>

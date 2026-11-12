@@ -408,7 +408,19 @@ internal fun SetupPanel(
                                 }
                             }
                         }
-                        SettingsGroup(stringResource(R.string.setup_runtime)) { runtimeCheck(false) }
+                        SettingsGroup(stringResource(R.string.setup_runtime)) {
+                            runtimeCheck(false)
+                            a.onImportRuntime?.let { onImport ->
+                                Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
+                                    SecondaryButton(
+                                        stringResource(R.string.rtinst_import_archive),
+                                        enabled = !s.busy && !s.runtimeActionsBlocked && !s.sessionRunning,
+                                        compact = true,
+                                        onClick = onImport,
+                                    )
+                                }
+                            }
+                        }
                         SteamIntegrationGroup(s.integration, s.integrationFocus, a.onIntegration, a.onIntegrationAppInfo, a.onIntegrationLocation)
                     }
                     1 -> {

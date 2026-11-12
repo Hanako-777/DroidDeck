@@ -1909,6 +1909,10 @@
     <string name="rtinst_removing_leftovers">正在移除运行时残留文件</string>
     <string name="rtinst_downloading">正在下载</string>
     <string name="rtinst_verifying">正在校验</string>
+    <string name="rtinst_import_archive">从文件安装</string>
+    <string name="rtinst_copying_archive">正在复制 Linux 运行时压缩包</string>
+    <string name="rtinst_import_catalog_failed">无法访问运行时清单来校验压缩包。</string>
+    <string name="rtinst_import_failed">无法安装 Linux 运行时。请确认文件与当前官方运行时压缩包一致，并检查所需的依赖能否下载。</string>
     <string name="rtinst_extracting">正在解压</string>
     <string name="rtinst_channel_description">在安装或移除 Linux 运行时期间显示</string>
     <string name="rtinst_title_installing">正在安装 Linux 运行时</string>

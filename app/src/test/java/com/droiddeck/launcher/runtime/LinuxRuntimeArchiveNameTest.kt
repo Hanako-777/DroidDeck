@@ -1,8 +1,12 @@
 package com.droiddeck.launcher.runtime
 
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,5 +36,24 @@ class LinuxRuntimeArchiveNameTest {
 
     @Test fun shortOrEmptyChecksumStillMakesAName() {
         assertEquals("linuxfs-r9-.tar.zst", LinuxRuntimeInstaller.archiveName(release("r9", "")))
+    }
+
+    @Test fun copiesAnArchiveOfTheCatalogSize() {
+        val bytes = ByteArray(96 * 1024) { it.toByte() }
+        val output = ByteArrayOutputStream()
+        LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), output, bytes.size.toLong())
+        assertArrayEquals(bytes, output.toByteArray())
+    }
+
+    @Test fun rejectsWrongArchiveSizesAndBoundsTheCopy() {
+        val bytes = ByteArray(96 * 1024)
+        val output = ByteArrayOutputStream()
+        assertThrows(IOException::class.java) {
+            LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), output, 64 * 1024L)
+        }
+        assertEquals(64 * 1024, output.size())
+        assertThrows(IOException::class.java) {
+            LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), ByteArrayOutputStream(), bytes.size + 1L)
+        }
     }
 }

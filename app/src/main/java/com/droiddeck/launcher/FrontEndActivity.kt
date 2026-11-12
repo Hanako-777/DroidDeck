@@ -116,6 +116,7 @@ class FrontEndActivity : ComponentActivity() {
     private var removalPending by mutableStateOf(false)
     private var available by mutableStateOf<LinuxRuntimeInstaller.Release?>(null)
     private var catalogFresh = false
+    private var pickingRuntimeArchive = false
     private var componentsQueueBusy by mutableStateOf(false)
     private var busy by mutableStateOf(false)
     private var stage by mutableStateOf("")
@@ -252,6 +253,10 @@ class FrontEndActivity : ComponentActivity() {
 
     private val pickComponent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == RESULT_OK) InAppFilePicker.pickedUri(r.data)?.let { importComponent(it) }
+    }
+    private val pickRuntimeArchive = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        pickingRuntimeArchive = false
+        if (uri != null) installRuntimeFromFile(uri)
     }
     private val pickLinuxDriver = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == RESULT_OK) InAppFilePicker.pickedUri(r.data)?.let { drivers.importDriver(it, linux = true) }
@@ -1339,6 +1344,12 @@ class FrontEndActivity : ComponentActivity() {
                         onInstallPackage = { id -> installPackage(id) },
                         onRemovePackage = { id -> removePackage(id) },
                         onRuntime = { onRuntimeButton() },
+                        onImportRuntime = {
+                            if (!runtimeChangesBlocked()) {
+                                pickingRuntimeArchive = true
+                                pickRuntimeArchive.launch(arrayOf("*/*"))
+                            }
+                        },
                         onVkBridge = { on ->
                             SessionPrefs.setVkBridge(this, on); SessionPrefs.setMaliFallbackByAuto(this, ""); vkBridge = on
                             if (!on) com.droiddeck.launcher.session.ComponentsManager.settleAutoDxvk(this)
@@ -3074,6 +3085,33 @@ class FrontEndActivity : ComponentActivity() {
         followRuntimeOperation { listener -> LinuxRuntimeInstaller.install(this, release, listener) }
     }
 
+    private fun installRuntimeFromFile(uri: Uri) {
+        if (runtimeChangesBlocked()) return
+        val knownRelease = available
+        val releaseHold = com.droiddeck.launcher.runtime.RuntimeInstallService.holdForPackage(
+            this, getString(R.string.rtinst_title_installing),
+        )
+        followRuntimeOperation { listener ->
+            try {
+                val release = knownRelease ?: LinuxRuntimeInstaller.fetchRelease()
+                val ok = release != null && LinuxRuntimeInstaller.installFromFile(this, release, uri) { stage, percent ->
+                    listener.onProgress(stage, percent)
+                    com.droiddeck.launcher.runtime.RuntimeInstallService.packageProgress(stage, percent)
+                }
+                if (!ok) ui.post {
+                    if (!isDestroyed) android.widget.Toast.makeText(
+                        this,
+                        if (release == null) R.string.rtinst_import_catalog_failed else R.string.rtinst_import_failed,
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
+                ok
+            } finally {
+                releaseHold()
+            }
+        }
+    }
+
     private fun followRuntimeOperation(run: (LinuxRuntimeInstaller.ProgressListener) -> Boolean?) {
         busy = true
         failed = false
@@ -3098,7 +3136,7 @@ class FrontEndActivity : ComponentActivity() {
 
     private fun autoUpdateRuntime() {
         val release = available?.takeIf { catalogFresh } ?: return
-        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || runtimeChangesBlocked() || removalPending) return
+        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || pickingRuntimeArchive || runtimeChangesBlocked() || removalPending) return
         if (installed != null) com.droiddeck.launcher.runtime.RuntimeAutoUpdate.seed(this)
         if (release.version == installed) return
         if (installed == null && (OfflineMode.enabled(this) || !com.droiddeck.launcher.core.DeviceSupport.canDraw(this) ||

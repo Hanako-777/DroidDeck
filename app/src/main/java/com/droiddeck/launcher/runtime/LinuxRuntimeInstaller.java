@@ -2,6 +2,7 @@ package com.droiddeck.launcher.runtime;
 
 import com.droiddeck.launcher.core.AddonPack;
 import android.content.Context;
+import android.net.Uri;
 import android.util.Log;
 
 
@@ -123,9 +124,18 @@ public final class LinuxRuntimeInstaller {
     private static final String USER_DATA = "root";
 
     public static boolean install(Context context, Release release, ProgressListener listener) {
+        return install(context, release, null, listener);
+    }
+
+    public static boolean installFromFile(Context context, Release release, Uri source, ProgressListener listener) {
+        return install(context, release, source, listener);
+    }
+
+    private static boolean install(Context context, Release release, Uri source, ProgressListener listener) {
         Job job;
         boolean owner;
         synchronized (JOB_LOCK) {
+            if (source != null && (running != null || sessionInUse())) return false;
             if (running != null && (running.removal || running.maintenance)) return false;
             owner = running == null;
             if (owner) { running = new Job(false, context.getString(R.string.user_apps_starting)); removalError = null; }
@@ -148,11 +158,11 @@ public final class LinuxRuntimeInstaller {
                 }
             };
             boolean desktop = DesktopCatalog.INSTANCE.desktopInstalled(app);
-            if (packsOnly(app, release, progress)) {
+            if (source == null && packsOnly(app, release, progress)) {
                 job.ok = true;
                 return true;
             }
-            job.ok = installOnce(app, release, progress);
+            job.ok = installOnce(app, release, source, progress);
             if (job.ok && desktop) keepDesktop(app, progress);
             return job.ok;
         } finally {
@@ -316,11 +326,23 @@ public final class LinuxRuntimeInstaller {
                 && LinuxRuntime.isInstalled(context);
     }
 
-    private static boolean installOnce(Context context, Release release, ProgressListener listener) {
-        File archive = new File(context.getCacheDir(), archiveName(release));
+    private static boolean installOnce(Context context, Release release, Uri source, ProgressListener listener) {
+        String name = archiveName(release);
+        File archive = new File(context.getCacheDir(), source == null ? name : "linux-runtime.import");
         boolean keepPartial = false;
         try {
-            deleteOtherArchives(context.getCacheDir(), archive.getName());
+            if (source == null) {
+                deleteOtherArchives(context.getCacheDir(), name);
+            } else {
+                if (listener != null) listener.onProgress(context.getString(R.string.rtinst_copying_archive), -1);
+                try (InputStream input = context.getContentResolver().openInputStream(source)) {
+                    if (input == null) throw new IOException("Cannot open the runtime archive");
+                    try (OutputStream output = new FileOutputStream(archive)) {
+                        copyArchive(input, output, release.size);
+                    }
+                }
+                if (!verifyArchive(context, release, archive, listener)) return false;
+            }
             File pendingRemoval = removalDirectory(LinuxRuntime.rootDir(context));
             if (pendingRemoval.exists() && listener != null) listener.onProgress(context.getString(R.string.rtinst_removing_leftovers), -1);
             if (!discard(pendingRemoval, null)) throw new IOException("Cannot clear the previous runtime: " + pendingRemoval);
@@ -331,23 +353,19 @@ public final class LinuxRuntimeInstaller {
                     && !SessionPrefs.allowStockProot(context))
                 throw new IOException("Cannot download proot");
             if (!AddonPack.DIRECTAUDIO.await(context, () -> true, packProgress(listener, downloading))) throw new IOException("Cannot download DirectAudio");
-            boolean ok = Downloader.downloadFile(release.url, archive, true, release.sha256, (fraction) -> {
-                if (listener != null) {
-                    listener.onProgress(Step.DOWNLOADING, downloading,
-                            fraction < 0 ? -1 : Math.round(fraction * 100f));
+            if (source == null) {
+                boolean ok = Downloader.downloadFile(release.url, archive, true, release.sha256, (fraction) -> {
+                    if (listener != null) {
+                        listener.onProgress(Step.DOWNLOADING, downloading,
+                                fraction < 0 ? -1 : Math.round(fraction * 100f));
+                    }
+                });
+                if (!ok) {
+                    Log.w(TAG, "download failed");
+                    keepPartial = true;
+                    return false;
                 }
-            });
-            if (!ok) {
-                Log.w(TAG, "download failed");
-                keepPartial = true;
-                return false;
-            }
-
-            if (listener != null) listener.onProgress(Step.VERIFYING, context.getString(R.string.rtinst_verifying), -1);
-            String actual = Hashes.sha256(archive);
-            if (!release.sha256.equalsIgnoreCase(actual)) {
-                Log.w(TAG, "checksum mismatch: wanted " + release.sha256 + ", got " + actual);
-                return false;
+                if (!verifyArchive(context, release, archive, listener)) return false;
             }
 
             File root = LinuxRuntime.rootDir(context);
@@ -422,6 +440,27 @@ public final class LinuxRuntimeInstaller {
         } finally {
             if (!keepPartial) archive.delete();
         }
+    }
+
+    static void copyArchive(InputStream input, OutputStream output, long size) throws IOException {
+        if (size <= 0) throw new IOException("Missing runtime archive size");
+        byte[] buffer = new byte[64 * 1024];
+        long copied = 0;
+        int count;
+        while ((count = input.read(buffer)) != -1) {
+            if (count > size - copied) throw new IOException("Runtime archive is larger than expected");
+            output.write(buffer, 0, count);
+            copied += count;
+        }
+        if (copied != size) throw new IOException("Runtime archive is smaller than expected");
+    }
+
+    private static boolean verifyArchive(Context context, Release release, File archive, ProgressListener listener) {
+        if (listener != null) listener.onProgress(Step.VERIFYING, context.getString(R.string.rtinst_verifying), -1);
+        String actual = Hashes.sha256(archive);
+        if (release.sha256.equalsIgnoreCase(actual)) return true;
+        Log.w(TAG, "checksum mismatch: wanted " + release.sha256 + ", got " + actual);
+        return false;
     }
 
     static final String CARRY_MARKER = ".droiddeck-carry";
