@@ -1,5 +1,6 @@
 package com.droiddeck.launcher
 
+import android.net.Uri
 import android.os.Handler
 import android.util.Log
 import androidx.annotation.VisibleForTesting
@@ -14,6 +15,7 @@ import com.droiddeck.launcher.session.SessionPhase
 import com.droiddeck.launcher.frontend.AutoComponents
 import com.droiddeck.launcher.runtime.LinuxRuntime
 import com.droiddeck.launcher.runtime.LinuxRuntimeInstaller
+import com.droiddeck.launcher.runtime.RuntimeInstallService
 
 internal class ProtonMenu(
     private val activity: android.app.Activity,
@@ -27,45 +29,76 @@ internal class ProtonMenu(
         val stage = mutableStateOf<String?>(null)
         val percent = mutableIntStateOf(-1)
         val problem = mutableStateOf<String?>(null)
+        val importing = mutableStateOf(false)
+        val importProblem = mutableStateOf<String?>(null)
     }
     var protonRows by Operation.rows
     var protonBusyId by Operation.busyId
     var protonStage by Operation.stage
     var protonPercent by Operation.percent
     var protonProblem by Operation.problem
+    var importing by Operation.importing
+        private set
+    var importProblem by Operation.importProblem
+        private set
     private val checking = java.util.concurrent.atomic.AtomicBoolean(false)
     @VisibleForTesting internal var installer: (ProtonExtras.Tool, (String, Int) -> Unit) -> String? =
         { tool, progress -> ProtonExtras.install(activity, tool, progress) }
 
     fun installProton(id: String, automatic: Boolean = false) {
         val tool = ProtonExtras.tools.firstOrNull { it.id == id } ?: return
+        startInstall(tool, automatic, local = false) { progress -> installer(tool, progress) }
+    }
+
+    fun importProton(source: Uri, name: String) {
+        val tool = ProtonExtras.tools.first { it.id == ProtonExtras.OWN }
+        startInstall(tool, automatic = false, local = true) { progress ->
+            ProtonExtras.installFromFile(activity, tool, source, name, progress)
+        }
+    }
+
+    fun showImportBlocked() {
+        importProblem = activity.getString(R.string.rtinst_import_busy)
+    }
+
+    private fun startInstall(
+        tool: ProtonExtras.Tool, automatic: Boolean, local: Boolean,
+        install: ((String, Int) -> Unit) -> String?,
+    ) {
         if (protonBusyId != null || ProtonExtras.installInProgress || SessionState.running) return
-        ProtonExtras.unqueue(activity, tool)
-        protonBusyId = id
+        if (!local) ProtonExtras.unqueue(activity, tool)
+        protonBusyId = tool.id
         protonProblem = null
         protonStage = activity.getString(R.string.store_starting)
         protonPercent = -1
+        if (local) importProblem = null
+        importing = local
+        val releaseHold = if (local) RuntimeInstallService.holdForPackage(activity, tool.name) else null
         Thread({
             val problem = runCatching {
-                installer(tool) { label, value ->
+                install { label, value ->
+                    if (local) RuntimeInstallService.packageProgress(label, value)
                     ui.post { protonStage = label; protonPercent = value }
                 }
             }.getOrElse { it.message ?: it.javaClass.simpleName }
+            releaseHold?.invoke()
             if (problem == null && !automatic && tool.id == ProtonExtras.OWN) ProtonExtras.setDeclined(activity, false)
             ui.post {
                 protonProblem = problem
+                if (local || (tool.id == ProtonExtras.OWN && problem == null)) importProblem = problem
+                importing = false
                 protonBusyId = null
                 protonStage = null
                 protonPercent = -1
                 refreshProtons()
                 if (problem != null) {
                     if (automatic) Log.w("ProtonMenu", "auto-update ${tool.id}: $problem")
-                    else android.widget.Toast.makeText(activity, problem, android.widget.Toast.LENGTH_LONG).show()
+                    else if (!local) android.widget.Toast.makeText(activity, problem, android.widget.Toast.LENGTH_LONG).show()
                 }
                 if (problem == null) onInstalled()
                 if (automatic) ensureAutoUpdates()
             }
-        }, "install-proton-$id").start()
+        }, "install-proton-${tool.id}").start()
     }
 
     fun removeProton(id: String, dir: String? = null, older: Boolean = false) {

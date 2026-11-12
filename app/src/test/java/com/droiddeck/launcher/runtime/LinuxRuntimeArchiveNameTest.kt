@@ -1,5 +1,6 @@
 package com.droiddeck.launcher.runtime
 
+import com.droiddeck.launcher.core.FileUtils
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import org.junit.Assert.assertArrayEquals
@@ -41,7 +42,7 @@ class LinuxRuntimeArchiveNameTest {
     @Test fun copiesAnArchiveOfTheCatalogSize() {
         val bytes = ByteArray(96 * 1024) { it.toByte() }
         val output = ByteArrayOutputStream()
-        LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), output, bytes.size.toLong())
+        FileUtils.copyExact(bytes.inputStream(), output, bytes.size.toLong())
         assertArrayEquals(bytes, output.toByteArray())
     }
 
@@ -49,11 +50,11 @@ class LinuxRuntimeArchiveNameTest {
         val bytes = ByteArray(96 * 1024)
         val output = ByteArrayOutputStream()
         assertThrows(IOException::class.java) {
-            LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), output, 64 * 1024L)
+            FileUtils.copyExact(bytes.inputStream(), output, 64 * 1024L)
         }
         assertEquals(64 * 1024, output.size())
         assertThrows(IOException::class.java) {
-            LinuxRuntimeInstaller.copyArchive(bytes.inputStream(), ByteArrayOutputStream(), bytes.size + 1L)
+            FileUtils.copyExact(bytes.inputStream(), ByteArrayOutputStream(), bytes.size + 1L)
         }
     }
 }

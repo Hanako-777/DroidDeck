@@ -344,7 +344,7 @@ public final class LinuxRuntimeInstaller {
                 try (InputStream input = context.getContentResolver().openInputStream(source)) {
                     if (input == null) throw new IOException("Cannot open the runtime archive");
                     try (OutputStream output = new FileOutputStream(archive)) {
-                        copyArchive(input, output, release.size);
+                        FileUtils.copyExact(input, output, release.size);
                     }
                 } catch (IOException | SecurityException e) {
                     Log.w(TAG, "runtime archive import", e);
@@ -458,19 +458,6 @@ public final class LinuxRuntimeInstaller {
         } finally {
             if (!keepPartial) archive.delete();
         }
-    }
-
-    static void copyArchive(InputStream input, OutputStream output, long size) throws IOException {
-        if (size <= 0) throw new IOException("Missing runtime archive size");
-        byte[] buffer = new byte[64 * 1024];
-        long copied = 0;
-        int count;
-        while ((count = input.read(buffer)) != -1) {
-            if (count > size - copied) throw new IOException("Runtime archive is larger than expected");
-            output.write(buffer, 0, count);
-            copied += count;
-        }
-        if (copied != size) throw new IOException("Runtime archive is smaller than expected");
     }
 
     private static boolean verifyArchive(Context context, Release release, File archive, ProgressListener listener) {

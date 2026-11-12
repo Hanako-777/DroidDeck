@@ -73,6 +73,16 @@ class ProtonExtrasTest {
     }
 
     @Test
+    fun localArchiveUsesItsOwnReleaseMetadata() {
+        val releases = JSONArray().put(droiddeckRelease("11-8")).put(droiddeckRelease("11-7.5"))
+        val droiddeck = tool("droiddeck")
+        val picked = ProtonExtras.pickAsset(droiddeck, releases, "DroidDeck-Proton-11-7.5-aarch64.tar.gz")
+        assertEquals("DroidDeck-Proton-11-7.5", picked?.tag)
+        assertNull(ProtonExtras.pickAsset(droiddeck, releases, "DroidDeck-Proton-11-7.5-x86_64.tar.gz"))
+        assertNull(ProtonExtras.pickAsset(droiddeck, releases, "DroidDeck-Proton-11-7.5-aarch64.sha512sum"))
+    }
+
+    @Test
     fun githubsDigestIsKeptBesideTheSha512File() {
         val sum = "ab".repeat(32)
         val release = release("GE-Proton11-7", asset("GE-Proton11-7-x86_64.tar.gz"), asset("GE-Proton11-7-aarch64.sha512sum"),

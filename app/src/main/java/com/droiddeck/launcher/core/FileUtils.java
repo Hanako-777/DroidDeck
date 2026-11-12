@@ -97,6 +97,19 @@ public final class FileUtils {
         for (int read = in.read(buffer); read > 0; read = in.read(buffer)) out.write(buffer, 0, read);
     }
 
+    public static void copyExact(InputStream input, OutputStream output, long size) throws IOException {
+        if (size <= 0) throw new IOException("Missing archive size");
+        byte[] buffer = new byte[1 << 16];
+        long copied = 0;
+        int count;
+        while ((count = input.read(buffer)) != -1) {
+            if (count > size - copied) throw new IOException("Archive is larger than expected");
+            output.write(buffer, 0, count);
+            copied += count;
+        }
+        if (copied != size) throw new IOException("Archive is smaller than expected");
+    }
+
     public static String sizeToString(long bytes) {
         if (bytes >= 1L << 30) return String.format(java.util.Locale.US, "%.1f GB", bytes / (float) (1L << 30));
         if (bytes >= 1L << 20) return String.format(java.util.Locale.US, "%.0f MB", bytes / (float) (1L << 20));

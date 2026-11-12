@@ -156,6 +156,10 @@ class FrontEndState(
     val removalPending: Boolean = false,
     val runtimeActionsBlocked: Boolean = false,
     val runtimeImportError: String? = null,
+    val localProtonInstalled: Boolean = false,
+    val localProtonStage: String? = null,
+    val localProtonPercent: Int = -1,
+    val localProtonError: String? = null,
     val backActionsInverted: Boolean = false,
     val buildLabel: String = "local",
     val oscMode: String = SessionPrefs.OSC_AUTO,
@@ -226,6 +230,7 @@ class FrontEndActions(
     val onRemovePackage: (String) -> Unit,
     val onRuntime: () -> Unit,
     val onImportRuntime: (() -> Unit)? = null,
+    val onImportProton: (() -> Unit)? = null,
     val onVkBridge: (Boolean) -> Unit = {},
     val onVenus: (Boolean) -> Unit = {},
     val onVkBridgeSafe: (Boolean) -> Unit = {},
@@ -465,7 +470,7 @@ private fun FrontEndScreenBody(s: FrontEndState, a: FrontEndActions, page: (@Com
             "components" -> a.onComponents(true)
             "setup:launcher" -> { SetupTabs.openLauncher = true; selected = "setup" }
             com.droiddeck.launcher.sync.SyncthingService.NAV -> com.droiddeck.launcher.sync.Syncthing.requestOpen()
-            "setup:integration" -> { SetupTabs.openOverview = true; selected = "setup" }
+            "setup:integration", "setup:install" -> { SetupTabs.openOverview = true; selected = "setup" }
             else -> selected = target
         }
         a.onNavigated()

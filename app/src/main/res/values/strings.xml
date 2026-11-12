@@ -2185,7 +2185,7 @@
     <string name="rtinst_removing_leftovers">Removing runtime leftovers</string>
     <string name="rtinst_downloading">Downloading</string>
     <string name="rtinst_verifying">Verifying</string>
-    <string name="rtinst_import_archive">Install from file</string>
+    <string name="rtinst_import_archive">Install Linux runtime from file</string>
     <string name="rtinst_copying_archive">Copying the Linux runtime archive</string>
     <string name="rtinst_import_checking_catalog">Checking the official runtime catalog</string>
     <string name="rtinst_import_catalog_failed">Could not reach the runtime catalog to verify the archive.</string>
@@ -2352,6 +2352,11 @@
     <string name="pextra_too_big">Download exceeded the release size and was deleted</string>
     <string name="pextra_incomplete">Download was incomplete; the partial file is kept for a resumable retry</string>
     <string name="pextra_verifying">Verifying download</string>
+    <string name="pextra_import_archive">Install DroidDeck-Proton from file</string>
+    <string name="pextra_import_checking">Checking official Proton releases</string>
+    <string name="pextra_import_copying">Copying the Proton archive</string>
+    <string name="pextra_import_no_release">Could not find this file in recent official %1$s ARM64 releases. Keep the original filename and make sure GitHub is reachable.</string>
+    <string name="pextra_import_read_failed">Could not copy the Proton archive. Check that it is readable and matches the published file size.</string>
     <string name="pextra_checksum_unreadable">Could not read the release checksum; try again</string>
     <string name="pextra_no_checksum">%1$s %2$s publishes no checksum; nothing was installed</string>
     <string name="pextra_checksum_mismatch">Checksum mismatch; the download was deleted</string>

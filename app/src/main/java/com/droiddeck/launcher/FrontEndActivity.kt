@@ -97,7 +97,7 @@ class FrontEndActivity : ComponentActivity() {
     private val updates = UpdatesMenu(this, ui)
     private val protons = ProtonMenu(
         this, ui,
-        idle = { !busy && flood == null && compatLaunch == null && pkgStage == null && components.compBusy == null },
+        idle = { !busy && !pickingInitialArchive && flood == null && compatLaunch == null && pkgStage == null && components.compBusy == null },
         onInstalled = { if (!OfflineMode.enabled(this)) components.checkComponentUpdates(force = false) },
     )
 
@@ -116,7 +116,7 @@ class FrontEndActivity : ComponentActivity() {
     private var removalPending by mutableStateOf(false)
     private var available by mutableStateOf<LinuxRuntimeInstaller.Release?>(null)
     private var catalogFresh = false
-    private var pickingRuntimeArchive = false
+    private var pickingInitialArchive = false
     private var runtimeImportError by mutableStateOf<String?>(null)
     private var componentsQueueBusy by mutableStateOf(false)
     private var busy by mutableStateOf(false)
@@ -256,8 +256,12 @@ class FrontEndActivity : ComponentActivity() {
         if (r.resultCode == RESULT_OK) InAppFilePicker.pickedUri(r.data)?.let { importComponent(it) }
     }
     private val pickRuntimeArchive = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        pickingRuntimeArchive = false
+        pickingInitialArchive = false
         if (uri != null) installRuntimeFromFile(uri)
+    }
+    private val pickProtonArchive = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        pickingInitialArchive = false
+        if (uri != null) installProtonFromFile(uri)
     }
     private val pickLinuxDriver = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == RESULT_OK) InAppFilePicker.pickedUri(r.data)?.let { drivers.importDriver(it, linux = true) }
@@ -1173,6 +1177,10 @@ class FrontEndActivity : ComponentActivity() {
                     FrontEndState(
                         installed = installed, ready = ready, available = available?.version, removalPending = removalPending, runtimeActionsBlocked = runtimeChangesBlocked(),
                         runtimeImportError = runtimeImportError,
+                        localProtonInstalled = protons.protonRows.any { it.id == ProtonExtras.OWN && it.installed != null },
+                        localProtonStage = protons.protonStage.takeIf { protons.importing },
+                        localProtonPercent = protons.protonPercent,
+                        localProtonError = protons.importProblem,
                         vkBridge = vkBridge, venus = venus, venusHostVulkan = venusHostVulkan, vkBridgeSafe = vkBridgeSafe, bridgeProtonDxvk = bridgeProtonDxvk, adreno = adrenoGpu,
                         shortcutPicker = shortcutPicker,
                         preparingGames = preparingGames,
@@ -1348,8 +1356,14 @@ class FrontEndActivity : ComponentActivity() {
                         onRuntime = { onRuntimeButton() },
                         onImportRuntime = {
                             if (!runtimeChangesBlocked()) {
-                                pickingRuntimeArchive = true
+                                pickingInitialArchive = true
                                 pickRuntimeArchive.launch(arrayOf("*/*"))
+                            }
+                        },
+                        onImportProton = {
+                            if (ready && !runtimeChangesBlocked()) {
+                                pickingInitialArchive = true
+                                pickProtonArchive.launch(arrayOf("*/*"))
                             }
                         },
                         onVkBridge = { on ->
@@ -2873,6 +2887,7 @@ class FrontEndActivity : ComponentActivity() {
         offline = OfflineMode.enabled(this)
         installed = LinuxRuntimeInstaller.installedVersion(this)
         ready = LinuxRuntime.isInstalled(this)
+        protons.refreshProtons()
         vkBridge = SessionPrefs.vkBridge(this)
         vkBridgeSafe = SessionPrefs.vkBridgeSafe(this)
         bridgeProtonDxvk = SessionPrefs.bridgeProtonDxvk(this)
@@ -3088,6 +3103,7 @@ class FrontEndActivity : ComponentActivity() {
     }
 
     private fun installRuntimeFromFile(uri: Uri) {
+        navRequest = "setup:install"
         if (runtimeChangesBlocked()) {
             runtimeImportError = getString(R.string.rtinst_import_busy)
             return
@@ -3097,7 +3113,7 @@ class FrontEndActivity : ComponentActivity() {
         val releaseHold = com.droiddeck.launcher.runtime.RuntimeInstallService.holdForPackage(
             this, getString(R.string.rtinst_title_installing),
         )
-        followRuntimeOperation { listener ->
+        followRuntimeOperation(checkProtons = false) { listener ->
             try {
                 if (knownRelease == null) listener.onProgress(getString(R.string.rtinst_import_checking_catalog), -1)
                 val release = knownRelease ?: LinuxRuntimeInstaller.fetchRelease()
@@ -3125,7 +3141,16 @@ class FrontEndActivity : ComponentActivity() {
         }
     }
 
-    private fun followRuntimeOperation(run: (LinuxRuntimeInstaller.ProgressListener) -> Boolean?) {
+    private fun installProtonFromFile(uri: Uri) {
+        navRequest = "setup:install"
+        if (!ready || runtimeChangesBlocked()) {
+            protons.showImportBlocked()
+            return
+        }
+        protons.importProton(uri, displayNameOf(uri).orEmpty())
+    }
+
+    private fun followRuntimeOperation(checkProtons: Boolean = true, run: (LinuxRuntimeInstaller.ProgressListener) -> Boolean?) {
         busy = true
         failed = false
         stage = getString(if (LinuxRuntimeInstaller.isMaintaining()) R.string.desktop_removing else if (LinuxRuntimeInstaller.isRemoving()) R.string.main_removing_runtime else R.string.store_starting)
@@ -3143,14 +3168,14 @@ class FrontEndActivity : ComponentActivity() {
                 }
                 refresh()
                 com.droiddeck.launcher.agent.AgentHost.refresh(this)
-                if (ok == true && LinuxRuntime.isInstalled(this)) protons.checkUpdates()
+                if (checkProtons && ok == true && LinuxRuntime.isInstalled(this)) protons.checkUpdates()
             }
         }, "runtime-operation").start()
     }
 
     private fun autoUpdateRuntime() {
         val release = available?.takeIf { catalogFresh } ?: return
-        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || pickingRuntimeArchive || runtimeChangesBlocked() || removalPending) return
+        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) || pickingInitialArchive || runtimeChangesBlocked() || removalPending) return
         if (installed != null) com.droiddeck.launcher.runtime.RuntimeAutoUpdate.seed(this)
         if (release.version == installed) return
         if (installed == null && (OfflineMode.enabled(this) || !com.droiddeck.launcher.core.DeviceSupport.canDraw(this) ||

@@ -414,15 +414,21 @@ internal fun SetupPanel(
                                 Text(message, fontSize = 13.sp, color = colors.error,
                                     modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp))
                             }
-                            a.onImportRuntime?.let { onImport ->
-                                Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
-                                    SecondaryButton(
-                                        stringResource(R.string.rtinst_import_archive),
-                                        enabled = !s.busy && !s.runtimeActionsBlocked && !s.sessionRunning,
-                                        compact = true,
-                                        onClick = onImport,
+                        }
+                        val protonStage = s.localProtonStage
+                        val protonError = s.localProtonError
+                        if (protonStage != null || protonError != null) SettingsGroup(stringResource(R.string.pextra_import_archive)) {
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                if (protonStage != null) {
+                                    Text(
+                                        if (s.localProtonPercent >= 0) stringResource(R.string.setup_runtime_progress, protonStage, s.localProtonPercent) else protonStage,
+                                        fontSize = 13.sp, color = colors.onSurfaceVariant, modifier = Modifier.padding(bottom = 5.dp),
                                     )
+                                    if (s.localProtonPercent >= 0) LinearProgressIndicator(
+                                        progress = { s.localProtonPercent / 100f }, modifier = Modifier.fillMaxWidth(),
+                                    ) else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                                 }
+                                if (protonError != null) Text(protonError, fontSize = 13.sp, color = colors.error)
                             }
                         }
                         SteamIntegrationGroup(s.integration, s.integrationFocus, a.onIntegration, a.onIntegrationAppInfo, a.onIntegrationLocation)

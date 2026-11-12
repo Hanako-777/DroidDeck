@@ -1909,7 +1909,7 @@
     <string name="rtinst_removing_leftovers">正在移除运行时残留文件</string>
     <string name="rtinst_downloading">正在下载</string>
     <string name="rtinst_verifying">正在校验</string>
-    <string name="rtinst_import_archive">从文件安装</string>
+    <string name="rtinst_import_archive">从文件安装 Linux 运行时</string>
     <string name="rtinst_copying_archive">正在复制 Linux 运行时压缩包</string>
     <string name="rtinst_import_checking_catalog">正在检查官方运行时清单</string>
     <string name="rtinst_import_catalog_failed">无法访问运行时清单来校验压缩包。</string>
@@ -2076,6 +2076,11 @@
     <string name="pextra_too_big">下载内容超出发布版本的大小，已删除</string>
     <string name="pextra_incomplete">下载不完整；已保留部分下载的文件，重试时可继续下载</string>
     <string name="pextra_verifying">正在校验下载</string>
+    <string name="pextra_import_archive">从文件安装 DroidDeck-Proton</string>
+    <string name="pextra_import_checking">正在检查 Proton 官方发布</string>
+    <string name="pextra_import_copying">正在复制 Proton 压缩包</string>
+    <string name="pextra_import_no_release">在近期官方 %1$s ARM64 发布中找不到该文件。请保留原始文件名，并确认 GitHub 可以访问。</string>
+    <string name="pextra_import_read_failed">无法复制 Proton 压缩包。请确认文件可读，大小与官方发布一致。</string>
     <string name="pextra_checksum_unreadable">无法读取发布版本的校验和；请重试</string>
     <string name="pextra_no_checksum">%1$s %2$s 未发布校验和；未安装任何内容</string>
     <string name="pextra_checksum_mismatch">校验和不匹配；已删除下载的文件</string>

@@ -148,17 +148,32 @@ internal fun SteamHome(s: FrontEndState, a: FrontEndActions, modifier: Modifier)
                 else if (s.integration.suggested && signedIn && !com.droiddeck.launcher.core.PhantomProcessLimit.blocksSteam(s.phantomProcessStatus))
                     IntegrationSuggestion(s.integration, { a.onSteamIntegration(null) }, a.onDismissIntegration)
             }
-            if (narrow) Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.onPlaced { words = it.boundsInParent() },
-            ) {
-                Wordmark(30.dp)
-                runtimeStatus()
-            } else Row(
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.onPlaced { words = it.boundsInParent() },
             ) {
-                Wordmark(if (narrow) 30.dp else 40.dp)
-                runtimeStatus()
+                if (narrow) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Wordmark(30.dp)
+                    runtimeStatus()
+                } else Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Wordmark(40.dp)
+                    runtimeStatus()
+                }
+                val runtimeImport = a.onImportRuntime.takeUnless { s.ready }
+                val protonImport = a.onImportProton.takeUnless { s.localProtonInstalled }
+                if (runtimeImport != null || protonImport != null) Actions {
+                    if (runtimeImport != null) SecondaryButton(
+                        stringResource(R.string.rtinst_import_archive),
+                        enabled = !s.runtimeActionsBlocked, compact = true, onClick = runtimeImport,
+                    )
+                    if (protonImport != null) SecondaryButton(
+                        stringResource(R.string.pextra_import_archive),
+                        enabled = s.ready && !s.runtimeActionsBlocked, compact = true, onClick = protonImport,
+                    )
+                }
             }
         },
         button = { click ->

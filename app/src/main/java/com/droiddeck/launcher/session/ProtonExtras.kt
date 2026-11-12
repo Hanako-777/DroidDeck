@@ -3,6 +3,7 @@ package com.droiddeck.launcher.session
 import com.droiddeck.launcher.core.Hashes
 import com.droiddeck.launcher.R
 import android.content.Context
+import android.net.Uri
 import android.os.StatFs
 import android.util.Log
 import com.droiddeck.launcher.core.Downloader
@@ -214,6 +215,38 @@ object ProtonExtras {
         return try { installNow(context, tool, onProgress) } finally { installInProgress = false }
     }
 
+    @Synchronized
+    fun installFromFile(context: Context, tool: Tool, source: Uri, name: String, onProgress: (String, Int) -> Unit): String? {
+        if (installInProgress) return context.getString(R.string.pextra_busy)
+        installInProgress = true
+        val archive = File(context.filesDir, "proton-downloads/local-import")
+        return try {
+            if (SessionState.running) return context.getString(R.string.pextra_stop_session)
+            if (!LinuxRuntime.isInstalled(context)) return context.getString(R.string.user_apps_runtime_required)
+            onProgress(context.getString(R.string.pextra_import_checking), -1)
+            val asset = findLatestAsset(tool, name) ?: return context.getString(R.string.pextra_import_no_release, tool.name)
+            if (asset.size <= 0) return context.getString(R.string.pextra_import_no_release, tool.name)
+            if (StatFs(LinuxRuntime.rootDir(context).path).availableBytes < NEED_BYTES + asset.size) {
+                return context.getString(R.string.pextra_no_space, tool.name)
+            }
+            onProgress(context.getString(R.string.pextra_import_copying), -1)
+            try {
+                archive.parentFile?.mkdirs()
+                val input = context.contentResolver.openInputStream(source)
+                    ?: return context.getString(R.string.pextra_import_read_failed)
+                input.use { stream -> archive.outputStream().use { FileUtils.copyExact(stream, it, asset.size) } }
+            } catch (e: Exception) {
+                Log.w(TAG, "copy local Proton archive", e)
+                return context.getString(R.string.pextra_import_read_failed)
+            }
+            val problem = installArchive(context, tool, asset, archive, onProgress)
+            problem ?: if (installed(context, tool) == null) context.getString(R.string.pextra_could_not_install, tool.name) else null
+        } finally {
+            archive.delete()
+            installInProgress = false
+        }
+    }
+
     private fun installNow(context: Context, tool: Tool, onProgress: (String, Int) -> Unit): String? {
         if (SessionState.running) return context.getString(R.string.pextra_stop_session)
         if (!LinuxRuntime.isInstalled(context)) return context.getString(R.string.user_apps_runtime_required)
@@ -252,6 +285,10 @@ object ProtonExtras {
             return context.getString(R.string.pextra_incomplete)
         }
 
+        return installArchive(context, tool, asset, archive, onProgress)
+    }
+
+    private fun installArchive(context: Context, tool: Tool, asset: Asset, archive: File, onProgress: (String, Int) -> Unit): String? {
         onProgress(context.getString(R.string.pextra_verifying), -1)
         val verified = when {
             asset.sha256 != null -> asset.sha256.equals(Hashes.sha256(archive), ignoreCase = true)
@@ -331,23 +368,26 @@ object ProtonExtras {
         }
     }
 
-    private fun findLatestAsset(tool: Tool): Asset? {
+    private fun findLatestAsset(tool: Tool, fileName: String? = null): Asset? {
         val releases = Downloader.downloadString(RELEASES.format(tool.repo)) ?: return null
         return try {
-            pickAsset(tool, JSONArray(releases))
+            pickAsset(tool, JSONArray(releases), fileName)
         } catch (e: Exception) {
             Log.w(TAG, "release metadata for ${tool.id}", e)
             null
         }
     }
 
-    internal fun pickAsset(tool: Tool, array: JSONArray): Asset? {
+    internal fun pickAsset(tool: Tool, array: JSONArray, fileName: String? = null): Asset? {
         for (i in 0 until array.length()) {
             val release = array.getJSONObject(i)
             if (release.optBoolean("draft", false) || release.optBoolean("prerelease", false)) continue
             val assets = release.optJSONArray("assets") ?: continue
             val entries = (0 until assets.length()).map { assets.getJSONObject(it) }
-            val archive = entries.sortedBy { it.optString("name") }.firstOrNull { tool.assetPattern.containsMatchIn(it.optString("name")) } ?: continue
+            val archive = entries.sortedBy { it.optString("name") }.firstOrNull {
+                val name = it.optString("name")
+                tool.assetPattern.containsMatchIn(name) && (fileName == null || name == fileName)
+            } ?: continue
             val name = archive.optString("name")
             val stem = name.substringBefore(".tar")
             val checksum = entries.firstOrNull {

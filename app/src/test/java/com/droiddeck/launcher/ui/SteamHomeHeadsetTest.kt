@@ -2,6 +2,7 @@ package com.droiddeck.launcher.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.droiddeck.launcher.glasses.Glasses
 import com.droiddeck.launcher.glasses.GlassesState
@@ -77,6 +79,30 @@ class SteamHomeHeadsetTest {
         compose.onNodeWithTag("drop-open").assertExists()
     }
 
+    @Test fun localInstallButtonsHideIndependentlyWhenTheirComponentsAreReady() {
+        val ready = mutableStateOf(false)
+        val proton = mutableStateOf(false)
+        var runtimePicks = 0
+        var protonPicks = 0
+        show(
+            runtimeReady = { ready.value }, onImportRuntime = { runtimePicks++ },
+            protonInstalled = { proton.value }, onImportProton = { protonPicks++ },
+        )
+        val runtimeLabel = "Install Linux runtime from file"
+        val protonLabel = "Install DroidDeck-Proton from file"
+        compose.onNodeWithText(runtimeLabel).assertIsEnabled().performClick()
+        assertEquals(1, runtimePicks)
+        compose.onNodeWithText(protonLabel).assertIsNotEnabled()
+        compose.runOnIdle { ready.value = true }
+        settle()
+        compose.onAllNodesWithText(runtimeLabel).assertCountEquals(0)
+        compose.onNodeWithText(protonLabel).assertIsEnabled().performClick()
+        assertEquals(1, protonPicks)
+        compose.runOnIdle { proton.value = true }
+        settle()
+        compose.onAllNodesWithText(protonLabel).assertCountEquals(0)
+    }
+
     private fun headset(state: GlassesState) {
         val field = Glasses::class.java.getDeclaredField("_state").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
@@ -85,20 +111,25 @@ class SteamHomeHeadsetTest {
 
     private fun settle() = compose.mainClock.advanceTimeBy(2_000)
 
-    private fun show() {
+    private fun show(
+        runtimeReady: () -> Boolean = { true }, onImportRuntime: (() -> Unit)? = null,
+        protonInstalled: () -> Boolean = { false }, onImportProton: (() -> Unit)? = null,
+    ) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             DroidDeckTheme {
                 CompositionLocalProvider(LocalFrontFocus provides FrontFocus()) {
                     FocusGlideHost {
                         SteamHome(FrontEndState(
-                            installed = "r9", ready = true, available = null, busy = false, stage = "", percent = -1,
+                            installed = "r9".takeIf { runtimeReady() }, ready = runtimeReady(), available = null, busy = false, stage = "", percent = -1,
+                            localProtonInstalled = protonInstalled(),
                             desktopInstalled = true, offlineAccount = null, offline = false, frameGenLabel = "",
                             romsDir = null, logsEnabled = false, steamGames = emptyList(), emulators = emptyList(), running = null,
                         ), FrontEndActions(
                             onPlay = {}, onPlaySteamVr = { vrStarts++ }, onPlayDesktopUi = {}, onSteamGame = {}, onDesktop = {}, onEmulator = {},
                             onRom = {}, onResume = {}, onSteamSettings = {}, onDesktopSettings = {},
                             onInstallPackage = {}, onRemovePackage = {}, onRuntime = {}, onFrameGenPick = {},
+                            onImportRuntime = onImportRuntime, onImportProton = onImportProton,
                             onImportLossless = {}, onProtons = {}, onComponents = {}, onPerformance = {},
                             onRoms = {}, onFiles = {}, onLogs = {}, onOffline = {},
                             onWirelessAdbPair = { _, _, _, _ -> }, onWirelessAdbApply = { _, _, _, _ -> },
