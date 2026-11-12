@@ -48,6 +48,8 @@ public final class LinuxRuntimeInstaller {
         default void onProgress(Step step, String stage, int percent) {
             onProgress(stage, percent);
         }
+
+        default void onImportFailure(int message) {}
     }
 
     public static final class Release {
@@ -155,6 +157,10 @@ public final class LinuxRuntimeInstaller {
                     job.stage = stage;
                     job.percent = percent;
                     for (ProgressListener l : job.listeners) l.onProgress(step, stage, percent);
+                }
+
+                @Override public void onImportFailure(int message) {
+                    if (listener != null) listener.onImportFailure(message);
                 }
             };
             boolean desktop = DesktopCatalog.INSTANCE.desktopInstalled(app);
@@ -340,8 +346,15 @@ public final class LinuxRuntimeInstaller {
                     try (OutputStream output = new FileOutputStream(archive)) {
                         copyArchive(input, output, release.size);
                     }
+                } catch (IOException | SecurityException e) {
+                    Log.w(TAG, "runtime archive import", e);
+                    if (listener != null) listener.onImportFailure(R.string.rtinst_import_read_failed);
+                    return false;
                 }
-                if (!verifyArchive(context, release, archive, listener)) return false;
+                if (!verifyArchive(context, release, archive, listener)) {
+                    if (listener != null) listener.onImportFailure(R.string.rtinst_import_checksum_failed);
+                    return false;
+                }
             }
             File pendingRemoval = removalDirectory(LinuxRuntime.rootDir(context));
             if (pendingRemoval.exists() && listener != null) listener.onProgress(context.getString(R.string.rtinst_removing_leftovers), -1);
@@ -350,9 +363,14 @@ public final class LinuxRuntimeInstaller {
             String downloading = context.getString(R.string.rtinst_downloading);
             if (listener != null) listener.onProgress(Step.DOWNLOADING, downloading, 0);
             if (!LinuxRuntime.patchedProot(context) && !AddonPack.PROOT.await(context, () -> true, packProgress(listener, downloading))
-                    && !SessionPrefs.allowStockProot(context))
+                    && !SessionPrefs.allowStockProot(context)) {
+                if (source != null && listener != null) listener.onImportFailure(R.string.rtinst_import_dependency_failed);
                 throw new IOException("Cannot download proot");
-            if (!AddonPack.DIRECTAUDIO.await(context, () -> true, packProgress(listener, downloading))) throw new IOException("Cannot download DirectAudio");
+            }
+            if (!AddonPack.DIRECTAUDIO.await(context, () -> true, packProgress(listener, downloading))) {
+                if (source != null && listener != null) listener.onImportFailure(R.string.rtinst_import_dependency_failed);
+                throw new IOException("Cannot download DirectAudio");
+            }
             if (source == null) {
                 boolean ok = Downloader.downloadFile(release.url, archive, true, release.sha256, (fraction) -> {
                     if (listener != null) {

@@ -410,6 +410,10 @@ internal fun SetupPanel(
                         }
                         SettingsGroup(stringResource(R.string.setup_runtime)) {
                             runtimeCheck(false)
+                            s.runtimeImportError?.let { message ->
+                                Text(message, fontSize = 13.sp, color = colors.error,
+                                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp))
+                            }
                             a.onImportRuntime?.let { onImport ->
                                 Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
                                     SecondaryButton(

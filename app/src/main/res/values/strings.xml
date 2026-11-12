@@ -2187,8 +2187,13 @@
     <string name="rtinst_verifying">Verifying</string>
     <string name="rtinst_import_archive">Install from file</string>
     <string name="rtinst_copying_archive">Copying the Linux runtime archive</string>
+    <string name="rtinst_import_checking_catalog">Checking the official runtime catalog</string>
     <string name="rtinst_import_catalog_failed">Could not reach the runtime catalog to verify the archive.</string>
-    <string name="rtinst_import_failed">Could not install the Linux runtime. Check that the file matches the current official runtime archive and that any required downloads are reachable.</string>
+    <string name="rtinst_import_read_failed">Could not copy the runtime archive. Check that the file is readable and matches the download size in the official runtime catalog.</string>
+    <string name="rtinst_import_checksum_failed">This file does not match the checksum in the official runtime catalog.</string>
+    <string name="rtinst_import_dependency_failed">The archive passed verification, but a required component (PRoot or DirectAudio) could not be downloaded.</string>
+    <string name="rtinst_import_busy">Wait for the current operation or session to finish, then select the archive again.</string>
+    <string name="rtinst_import_failed">Could not install the Linux runtime. Check the runtime installer log for details.</string>
     <string name="rtinst_extracting">Extracting</string>
     <string name="rtinst_channel_description">Shows while the Linux runtime is installed or removed</string>
     <string name="rtinst_title_installing">Installing the Linux runtime</string>

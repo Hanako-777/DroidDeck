@@ -117,6 +117,7 @@ class FrontEndActivity : ComponentActivity() {
     private var available by mutableStateOf<LinuxRuntimeInstaller.Release?>(null)
     private var catalogFresh = false
     private var pickingRuntimeArchive = false
+    private var runtimeImportError by mutableStateOf<String?>(null)
     private var componentsQueueBusy by mutableStateOf(false)
     private var busy by mutableStateOf(false)
     private var stage by mutableStateOf("")
@@ -1171,6 +1172,7 @@ class FrontEndActivity : ComponentActivity() {
                 FrontEndScreen(
                     FrontEndState(
                         installed = installed, ready = ready, available = available?.version, removalPending = removalPending, runtimeActionsBlocked = runtimeChangesBlocked(),
+                        runtimeImportError = runtimeImportError,
                         vkBridge = vkBridge, venus = venus, venusHostVulkan = venusHostVulkan, vkBridgeSafe = vkBridgeSafe, bridgeProtonDxvk = bridgeProtonDxvk, adreno = adrenoGpu,
                         shortcutPicker = shortcutPicker,
                         preparingGames = preparingGames,
@@ -3086,25 +3088,36 @@ class FrontEndActivity : ComponentActivity() {
     }
 
     private fun installRuntimeFromFile(uri: Uri) {
-        if (runtimeChangesBlocked()) return
+        if (runtimeChangesBlocked()) {
+            runtimeImportError = getString(R.string.rtinst_import_busy)
+            return
+        }
+        runtimeImportError = null
         val knownRelease = available
         val releaseHold = com.droiddeck.launcher.runtime.RuntimeInstallService.holdForPackage(
             this, getString(R.string.rtinst_title_installing),
         )
         followRuntimeOperation { listener ->
             try {
+                if (knownRelease == null) listener.onProgress(getString(R.string.rtinst_import_checking_catalog), -1)
                 val release = knownRelease ?: LinuxRuntimeInstaller.fetchRelease()
-                val ok = release != null && LinuxRuntimeInstaller.installFromFile(this, release, uri) { stage, percent ->
-                    listener.onProgress(stage, percent)
-                    com.droiddeck.launcher.runtime.RuntimeInstallService.packageProgress(stage, percent)
+                var error = R.string.rtinst_import_failed
+                val ok = if (release == null) {
+                    error = R.string.rtinst_import_catalog_failed
+                    false
+                } else {
+                    LinuxRuntimeInstaller.installFromFile(this, release, uri, object : LinuxRuntimeInstaller.ProgressListener {
+                        override fun onProgress(stage: String, percent: Int) {
+                            listener.onProgress(stage, percent)
+                            com.droiddeck.launcher.runtime.RuntimeInstallService.packageProgress(stage, percent)
+                        }
+
+                        override fun onImportFailure(message: Int) {
+                            error = message
+                        }
+                    })
                 }
-                if (!ok) ui.post {
-                    if (!isDestroyed) android.widget.Toast.makeText(
-                        this,
-                        if (release == null) R.string.rtinst_import_catalog_failed else R.string.rtinst_import_failed,
-                        android.widget.Toast.LENGTH_LONG,
-                    ).show()
-                }
+                if (!ok) ui.post { runtimeImportError = getString(error) }
                 ok
             } finally {
                 releaseHold()
@@ -3123,6 +3136,7 @@ class FrontEndActivity : ComponentActivity() {
             })
             ui.post {
                 busy = false
+                if (ok == true && LinuxRuntime.isInstalled(this)) runtimeImportError = null
                 if (ok != null) failed = !ok
                 if (ok == false) LinuxRuntimeInstaller.removalError()?.let {
                     android.widget.Toast.makeText(this, it, android.widget.Toast.LENGTH_LONG).show()

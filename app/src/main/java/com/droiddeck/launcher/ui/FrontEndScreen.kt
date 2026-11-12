@@ -155,6 +155,7 @@ class FrontEndState(
     val battleNetInstalled: Boolean = false,
     val removalPending: Boolean = false,
     val runtimeActionsBlocked: Boolean = false,
+    val runtimeImportError: String? = null,
     val backActionsInverted: Boolean = false,
     val buildLabel: String = "local",
     val oscMode: String = SessionPrefs.OSC_AUTO,

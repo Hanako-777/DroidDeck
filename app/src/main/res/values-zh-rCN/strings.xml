@@ -1911,8 +1911,13 @@
     <string name="rtinst_verifying">正在校验</string>
     <string name="rtinst_import_archive">从文件安装</string>
     <string name="rtinst_copying_archive">正在复制 Linux 运行时压缩包</string>
+    <string name="rtinst_import_checking_catalog">正在检查官方运行时清单</string>
     <string name="rtinst_import_catalog_failed">无法访问运行时清单来校验压缩包。</string>
-    <string name="rtinst_import_failed">无法安装 Linux 运行时。请确认文件与当前官方运行时压缩包一致，并检查所需的依赖能否下载。</string>
+    <string name="rtinst_import_read_failed">无法复制运行时压缩包。请检查文件是否可读，大小是否与官方清单一致。</string>
+    <string name="rtinst_import_checksum_failed">文件的校验值与官方运行时清单不一致。</string>
+    <string name="rtinst_import_dependency_failed">压缩包已通过校验，但无法下载所需的组件（PRoot 或 DirectAudio）。</string>
+    <string name="rtinst_import_busy">请等待当前操作或会话结束，再重新选择压缩包。</string>
+    <string name="rtinst_import_failed">无法安装 Linux 运行时。请查看运行时安装日志。</string>
     <string name="rtinst_extracting">正在解压</string>
     <string name="rtinst_channel_description">在安装或移除 Linux 运行时期间显示</string>
     <string name="rtinst_title_installing">正在安装 Linux 运行时</string>
